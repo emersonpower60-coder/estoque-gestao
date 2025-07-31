@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestão de Estoque</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#2563EB" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  </head>
+  <body class="bg-gray-100 text-gray-800">
+    <div id="root" class="p-6 max-w-4xl mx-auto"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+      }
+
+      const { useState, useEffect } = React;
+
+      function App() {
+        const [produtos, setProdutos] = useState(() => {
+          const local = localStorage.getItem("estoque");
+          return local ? JSON.parse(local) : [];
+        });
+
+        const [nome, setNome] = useState("");
+        const [quantidade, setQuantidade] = useState("");
+
+        useEffect(() => {
+          localStorage.setItem("estoque", JSON.stringify(produtos));
+        }, [produtos]);
+
+        const adicionarProduto = () => {
+          if (!nome || Number(quantidade) <= 0) return;
+          setProdutos([
+            ...produtos,
+            {
+              id: Date.now(),
+              nome,
+              quantidade: Number(quantidade),
+              historico: [{ data: new Date(), quantidade: Number(quantidade) }],
+            },
+          ]);
+          setNome("");
+          setQuantidade("");
+        };
+
+        const registrarVenda = (id) => {
+          setProdutos(produtos.map(p => {
+            if (p.id === id && p.quantidade > 0) {
+              const novaQtd = p.quantidade - 1;
+              return {
+                ...p,
+                quantidade: novaQtd,
+                historico: [...p.historico, { data: new Date(), quantidade: novaQtd }],
+              };
+            }
+            return p;
+          }));
+        };
+
+        const mediaDias = (historico) => {
+          if (historico.length < 2) return "-";
+          const inicio = new Date(historico[0].data);
+          const fim = new Date(historico[historico.length - 1].data);
+          const dias = (fim - inicio) / (1000 * 60 * 60 * 24);
+          const usados = historico[0].quantidade - historico[historico.length - 1].quantidade;
+          return usados > 0 ? (dias / usados).toFixed(1) : "-";
+        };
+
+        const deveAlertar = (p) => {
+          const media = parseFloat(mediaDias(p.historico));
+          if (isNaN(media)) return true;
+          return p.quantidade * media < 7;
+        };
+
+        return React.createElement(
+          "div",
+          { className: "space-y-6" },
+          React.createElement("h1", { className: "text-2xl font-bold text-center" }, "📦 Gestão de Estoque"),
+          React.createElement(
+            "div",
+            { className: "flex flex-wrap gap-2 justify-center" },
+            React.createElement("input", {
+              className: "border p-2 rounded w-1/2 min-w-[200px]",
+              placeholder: "Nome do produto",
+              value: nome,
+              onChange: (e) => setNome(e.target.value),
+            }),
+            React.createElement("input", {
+              type: "number",
+              className: "border p-2 rounded w-1/4 min-w-[100px]",
+              placeholder: "Quantidade",
+              value: quantidade,
+              onChange: (e) => setQuantidade(e.target.value),
+            }),
+            React.createElement(
+              "button",
+              {
+                onClick: adicionarProduto,
+                className: "bg-blue-600 text-white px-4 py-2 rounded",
+              },
+              "Adicionar"
+            )
+          ),
+          React.createElement(
+            "div",
+            { className: "overflow-x-auto" },
+            React.createElement(
+              "table",
+              { className: "w-full table-auto border border-gray-300" },
+              React.createElement(
+                "thead",
+                null,
+                React.createElement(
+                  "tr",
+                  { className: "bg-gray-200" },
+                  ["Produto", "Qtd", "Média (dias/unid)", "Ação", "Alerta"].map((text, idx) =>
+                    React.createElement("th", { key: idx, className: "p-2 border" }, text)
+                  )
+                )
+              ),
+              React.createElement(
+                "tbody",
+                null,
+                produtos.map((p) =>
+                  React.createElement(
+                    "tr",
+                    { key: p.id, className: "text-center bg-white even:bg-gray-50" },
+                    React.createElement("td", { className: "p-2 border" }, p.nome),
+                    React.createElement("td", { className: "p-2 border" }, p.quantidade),
+                    React.createElement("td", { className: "p-2 border" }, mediaDias(p.historico)),
+                    React.createElement(
+                      "td",
+                      { className: "p-2 border" },
+                      React.createElement(
+                        "button",
+                        {
+                          onClick: () => registrarVenda(p.id),
+                          className: "bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700",
+                        },
+                        "Vender"
+                      )
+                    ),
+                    React.createElement(
+                      "td",
+                      { className: "p-2 border" },
+                      deveAlertar(p)
+                        ? React.createElement("span", { className: "text-red-600 font-bold animate-pulse" }, "⚠")
+                        : null
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+    </script>
+  </body>
+</html>
